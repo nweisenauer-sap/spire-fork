@@ -104,10 +104,15 @@ func (s *Service) ListAgents(ctx context.Context, req *agentv1.ListAgentsRequest
 		if filter.ByCanReattest != nil {
 			byCanReattest = &filter.ByCanReattest.Value
 		}
+		var byExpiresBefore time.Time
+		if filter.ByExpiresBefore != nil {
+			byExpiresBefore = filter.ByExpiresBefore.AsTime()
+		}
 
 		listReq.ByAttestationType = filter.ByAttestationType
 		listReq.ByBanned = byBanned
 		listReq.ByCanReattest = byCanReattest
+		listReq.ByExpiresBefore = byExpiresBefore
 
 		if filter.BySelectorMatch != nil {
 			selectors, err := api.SelectorsFromProto(filter.BySelectorMatch.Selectors)
@@ -700,6 +705,10 @@ func fieldsFromFilterRequest(filter *agentv1.ListAgentsRequest_Filter) logrus.Fi
 
 	if filter.ByCanReattest != nil {
 		fields[telemetry.ByCanReattest] = filter.ByCanReattest.Value
+	}
+
+	if filter.ByExpiresBefore != nil {
+		fields[telemetry.ByExpiresBefore] = filter.ByExpiresBefore.AsTime().String()
 	}
 
 	if filter.BySelectorMatch != nil {

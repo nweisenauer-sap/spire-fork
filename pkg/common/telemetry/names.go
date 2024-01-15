@@ -169,6 +169,9 @@ const (
 	// ByCanReattest tags filtering by agents that can re-attest
 	ByCanReattest = "by_can_reattest"
 
+	// ByExpiresBefore tags filtering by expiration time
+	ByExpiresBefore = "by_expires_before"
+
 	// BySelectorMatch tags Match used when filtering by Selectors
 	BySelectorMatch = "by_selector_match"
 

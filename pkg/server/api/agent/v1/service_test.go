@@ -37,6 +37,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
@@ -254,16 +255,17 @@ func TestCountAgents(t *testing.T) {
 func TestListAgents(t *testing.T) {
 	test := setupServiceTest(t, 0)
 	defer test.Cleanup()
-
 	notAfter := time.Now().Add(-time.Minute).Unix()
-	newNoAfter := time.Now().Add(time.Minute).Unix()
+	newNotAfter := time.Now().Add(time.Minute).Unix()
+	yesterday := time.Now().Add(-24 * 60 * time.Minute).Unix()
+	tomorrow := time.Now().Add(24 * 60 * time.Minute).Unix()
 	node1ID := spiffeid.RequireFromPath(td, "/node1")
 	node1 := &common.AttestedNode{
 		SpiffeId:            node1ID.String(),
 		AttestationDataType: "t1",
 		CertSerialNumber:    "badcafe",
 		CertNotAfter:        notAfter,
-		NewCertNotAfter:     newNoAfter,
+		NewCertNotAfter:     newNotAfter,
 		NewCertSerialNumber: "new badcafe",
 		CanReattest:         false,
 		Selectors: []*common.Selector{
@@ -282,7 +284,7 @@ func TestListAgents(t *testing.T) {
 		AttestationDataType: "t2",
 		CertSerialNumber:    "deadbeef",
 		CertNotAfter:        notAfter,
-		NewCertNotAfter:     newNoAfter,
+		NewCertNotAfter:     newNotAfter,
 		NewCertSerialNumber: "new deadbeef",
 		CanReattest:         false,
 		Selectors: []*common.Selector{
@@ -301,7 +303,7 @@ func TestListAgents(t *testing.T) {
 		AttestationDataType: "t3",
 		CertSerialNumber:    "",
 		CertNotAfter:        notAfter,
-		NewCertNotAfter:     newNoAfter,
+		NewCertNotAfter:     newNotAfter,
 		NewCertSerialNumber: "",
 		CanReattest:         true,
 	}
@@ -537,6 +539,62 @@ func TestListAgents(t *testing.T) {
 						telemetry.Status:        "success",
 						telemetry.Type:          "audit",
 						telemetry.ByCanReattest: "false",
+					},
+				},
+			},
+		},
+		{
+			name: "by expires before (notAfter > byExpiresBefore)",
+			req: &agentv1.ListAgentsRequest{
+				OutputMask: &types.AgentMask{},
+				Filter: &agentv1.ListAgentsRequest_Filter{
+					ByExpiresBefore: &timestamppb.Timestamp{
+						Seconds: yesterday,
+						Nanos:   0,
+					},
+				},
+			},
+			expectResp: &agentv1.ListAgentsResponse{
+				Agents: []*types.Agent{},
+			},
+			expectLogs: []spiretest.LogEntry{
+				{
+					Level:   logrus.InfoLevel,
+					Message: "API accessed",
+					Data: logrus.Fields{
+						telemetry.Status:          "success",
+						telemetry.Type:            "audit",
+						telemetry.ByExpiresBefore: time.Unix(yesterday, 0).UTC().String(),
+					},
+				},
+			},
+		},
+		{
+			name: "by expires before (notAfter < byExpiresBefore)",
+			req: &agentv1.ListAgentsRequest{
+				OutputMask: &types.AgentMask{},
+				Filter: &agentv1.ListAgentsRequest_Filter{
+					ByExpiresBefore: &timestamppb.Timestamp{
+						Seconds: tomorrow,
+						Nanos:   0,
+					},
+				},
+			},
+			expectResp: &agentv1.ListAgentsResponse{
+				Agents: []*types.Agent{
+					{Id: api.ProtoFromID(node1ID)},
+					{Id: api.ProtoFromID(node2ID)},
+					{Id: api.ProtoFromID(node3ID)},
+				},
+			},
+			expectLogs: []spiretest.LogEntry{
+				{
+					Level:   logrus.InfoLevel,
+					Message: "API accessed",
+					Data: logrus.Fields{
+						telemetry.Status:          "success",
+						telemetry.Type:            "audit",
+						telemetry.ByExpiresBefore: time.Unix(tomorrow, 0).UTC().String(),
 					},
 				},
 			},
